@@ -30,6 +30,32 @@ npm start
 
 The server will start and listen for MCP requests on stdio.
 
+## Integration with Claude Desktop
+
+To integrate this server with Claude Desktop, add the following to your `claude_desktop_config.json`:
+
+```json
+{
+    "mcpServers": {
+        "email-mcp": {
+            "command": "node",
+            "args": [
+                "D:\\projects\\Bitsol Projects\\email-mcp\\dist\\src\\index.js"
+            ],
+            "env": {
+                "SMTP_HOST": "smtp.gmail.com",
+                "SMTP_PORT": "587",
+                "SMTP_SECURE": "false",
+                "SMTP_USER": "<your_email>",
+                "SMTP_PASS": "<your_app_password>"
+            }
+        }
+    }
+}
+```
+
+Replace `<your_email>` and `<your_app_password>` with your actual SMTP credentials.
+
 ## Tool: send_email
 
 ### Arguments

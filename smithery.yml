@@ -1,0 +1,17 @@
+name: email-mcp-server
+image: ${SMITHERY_REGISTRY}/email-mcp-server:latest
+ports:
+  - port: 3000
+    protocol: TCP
+    public: true
+resources:
+  cpu: 0.5
+  memory: 512Mi
+healthcheck:
+  path: /health
+  port: 3000
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1

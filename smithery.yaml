@@ -15,3 +15,4 @@ healthcheck:
   timeoutSeconds: 5
   failureThreshold: 3
   successThreshold: 1
+startCommand: ["node", "dist/src/index.js"]

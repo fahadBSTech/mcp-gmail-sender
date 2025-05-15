@@ -16,6 +16,8 @@ healthcheck:
   failureThreshold: 3
   successThreshold: 1
 startCommand:
+  type: stdio
   command: node
   args:
     - dist/src/index.js
+  commandFunction: main

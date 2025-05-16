@@ -1,23 +1,28 @@
-name: email-mcp-server
-image: ${SMITHERY_REGISTRY}/email-mcp-server:latest
-ports:
-  - port: 3000
-    protocol: TCP
-    public: true
-resources:
-  cpu: 0.5
-  memory: 512Mi
-healthcheck:
-  path: /health
-  port: 3000
-  initialDelaySeconds: 10
-  periodSeconds: 30
-  timeoutSeconds: 5
-  failureThreshold: 3
-  successThreshold: 1
+
 startCommand:
   type: stdio
-  command: node
-  args:
-    - dist/src/index.js
-  commandFunction: main
+  configSchema:
+    type: object
+    required:
+      - SMTP_HOST
+      - SMTP_PORT
+      - SMTP_USER
+      - SMTP_PASS
+    properties:
+      SMTP_HOST:
+        type: string
+        description: "SMTP host"
+      SMTP_PORT:
+        type: number
+        description: "SMTP port"
+      SMTP_USER:
+        type: string
+        description: "SMTP user"
+      SMTP_PASS:
+        type: string
+        description: "SMTP password"
+        
+  commandFunction:
+    # A function that produces the CLI command to start the MCP on stdio.
+    |-
+    (config) => ({command: 'node', args: ['dist/src/index.js'], env: {SMTP_HOST: config.SMTP_HOST, SMTP_PORT: config.SMTP_PORT, SMTP_USER: config.SMTP_USER, SMTP_PASS: config.SMTP_PASS}})

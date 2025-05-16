@@ -9,7 +9,23 @@ import {
 import nodemailer from "nodemailer";
 import { SendEmailArgs } from "./types.js";
 import { sendEmailTool } from "./constant.js";
+import { z } from "zod";
 import dotenv from "dotenv";
+import {zodToJsonSchema} from "zod-to-json-schema";
+
+
+// Schema definitions
+const SendEmailSchema = z.object({
+  to: z.array(z.string()).describe("List of recipient email addresses"),
+  subject: z.string().describe("Email subject"),
+  body: z.string().describe("Email body content (used for text/plain or when htmlBody not provided)"),
+  htmlBody: z.string().optional().describe("HTML version of the email body"),
+  mimeType: z.enum(['text/plain', 'text/html', 'multipart/alternative']).optional().default('text/plain').describe("Email content type"),
+  cc: z.array(z.string()).optional().describe("List of CC recipients"),
+  bcc: z.array(z.string()).optional().describe("List of BCC recipients"),
+  threadId: z.string().optional().describe("Thread ID to reply to"),
+  inReplyTo: z.string().optional().describe("Message ID being replied to"),
+});
 
 dotenv.config();
 
@@ -53,30 +69,41 @@ async function main() {
   }
 
   console.error("Starting Email MCP Server...");
-  const server = new Server(
-    {
-      name: "Email MCP Server",
-      version: "1.0.0",
-    },
-    {
-      capabilities: {
-        tools: {},
+  const server = new Server({
+    name: "Email MCP Server",
+    version: "1.0.0",
+  }, {
+    capabilities: {
+      tools: {
+        send_email: sendEmailTool,
       },
-    }
-  );
+    },
+  });
 
   const emailClient = new EmailClient();
+
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    console.error("Received ListToolsRequest");
+    return {
+      tools: [{
+        name: "send_email",
+        description: "Send an email",
+        parameters: zodToJsonSchema(SendEmailSchema),
+      }],
+    };
+  });
 
   server.setRequestHandler(
     CallToolRequestSchema,
     async (request: CallToolRequest) => {
       console.error("Received CallToolRequest:", request);
+      const {name, arguments: args} = request.params;
       try {
-        if (!request.params.arguments) {
+        if (!args) {
           throw new Error("No arguments provided");
         }
 
-        switch (request.params.name) {
+        switch (name) {
           case "send_email": {
             const args = request.params.arguments as unknown as SendEmailArgs;
             if (!args.to || !args.subject || !args.text) {
@@ -117,21 +144,14 @@ async function main() {
     }
   );
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => {
-    console.error("Received ListToolsRequest");
-    return {
-      tools: [sendEmailTool],
-    };
-  });
+ 
 
   const transport = new StdioServerTransport();
-  console.error("Connecting server to transport...");
-  await server.connect(transport);
-
   console.error("Email MCP Server running on stdio");
+  await server.connect(transport);
 }
 
 main().catch((error) => {
   console.error("Fatal error in main():", error);
   process.exit(1);
-}); 
+});

@@ -1,25 +1,21 @@
-FROM node:22.12-alpine AS builder
+# Dockerfile for Email MCP Server
+FROM node:18-alpine
 
-# Must be entire project because `prepare` script is run during `npm install` and requires all files.
-COPY . /app
-COPY tsconfig.json /tsconfig.json
-
+# Create app directory
 WORKDIR /app
 
-RUN --mount=type=cache,target=/root/.npm npm install
+# Copy the entire project first
+COPY . .
 
-RUN --mount=type=cache,target=/root/.npm-production npm ci --ignore-scripts --omit-dev
+# Install dependencies with script execution disabled
+RUN npm ci --ignore-scripts && npm run build
 
-FROM node:22-alpine AS release
+# Set environment variables for HTTP transport
+ENV TRANSPORT=http
+ENV PORT=3000
 
-COPY --from=builder /app/dist /app/dist
-COPY --from=builder /app/package.json /app/package.json
-COPY --from=builder /app/package-lock.json /app/package-lock.json
+# Expose the port
+EXPOSE 3000
 
-ENV NODE_ENV=production
-
-WORKDIR /app
-
-RUN npm ci --ignore-scripts --omit-dev
-
-ENTRYPOINT ["node", "dist/src/index.js"]
+# Start the server
+CMD ["node", "dist/src/index.js"]

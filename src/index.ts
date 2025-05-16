@@ -1,31 +1,10 @@
 #!/usr/bin/env node
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import {
-  CallToolRequest,
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
-import nodemailer from "nodemailer";
-import { SendEmailArgs } from "./types.js";
-import { sendEmailTool } from "./constant.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import dotenv from "dotenv";
-import {zodToJsonSchema} from "zod-to-json-schema";
-
-
-// Schema definitions
-const SendEmailSchema = z.object({
-  to: z.array(z.string()).describe("List of recipient email addresses"),
-  subject: z.string().describe("Email subject"),
-  body: z.string().describe("Email body content (used for text/plain or when htmlBody not provided)"),
-  htmlBody: z.string().optional().describe("HTML version of the email body"),
-  mimeType: z.enum(['text/plain', 'text/html', 'multipart/alternative']).optional().default('text/plain').describe("Email content type"),
-  cc: z.array(z.string()).optional().describe("List of CC recipients"),
-  bcc: z.array(z.string()).optional().describe("List of BCC recipients"),
-  threadId: z.string().optional().describe("Thread ID to reply to"),
-  inReplyTo: z.string().optional().describe("Message ID being replied to"),
-});
+import { createStatefulServer } from "@smithery/sdk/server/stateful.js";
+import nodemailer from "nodemailer";
+import { SendEmailArgs } from "./types.js";
 
 dotenv.config();
 
@@ -56,102 +35,53 @@ class EmailClient {
   }
 }
 
-async function main() {
-  if (
-    !process.env.SMTP_HOST ||
-    !process.env.SMTP_USER ||
-    !process.env.SMTP_PASS
-  ) {
-    console.error(
-      "Please set SMTP_HOST, SMTP_USER, SMTP_PASS environment variables"
-    );
+const { app } = createStatefulServer<{}>(() => {
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.error("Please set SMTP_HOST, SMTP_USER, SMTP_PASS environment variables");
     process.exit(1);
   }
 
-  console.error("Starting Email MCP Server...");
-  const server = new Server({
+  console.log("Starting Email MCP Server...");
+  const server = new McpServer({
     name: "Email MCP Server",
     version: "1.0.0",
-  }, {
-    capabilities: {
-      tools: {
-        send_email: sendEmailTool,
-      },
-    },
   });
 
   const emailClient = new EmailClient();
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => {
-    console.error("Received ListToolsRequest");
-    return {
-      tools: [{
-        name: "send_email",
-        description: "Send an email",
-        parameters: zodToJsonSchema(SendEmailSchema),
-      }],
-    };
-  });
-
-  server.setRequestHandler(
-    CallToolRequestSchema,
-    async (request: CallToolRequest) => {
-      console.error("Received CallToolRequest:", request);
-      const {name, arguments: args} = request.params;
-      try {
-        if (!args) {
-          throw new Error("No arguments provided");
-        }
-
-        switch (name) {
-          case "send_email": {
-            const args = request.params.arguments as unknown as SendEmailArgs;
-            if (!args.to || !args.subject || !args.text) {
-              throw new Error(
-                "Missing required arguments: to, subject, and text"
-              );
-            }
-            const response = await emailClient.sendEmail(args);
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: JSON.stringify({
-                    messageId: response.messageId,
-                    accepted: response.accepted,
-                    rejected: response.rejected,
-                  }),
-                },
-              ],
-            };
-          }
-          default:
-            throw new Error(`Unknown tool: ${request.params.name}`);
-        }
-      } catch (error) {
-        console.error("Error executing tool:", error);
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({
-                error: error instanceof Error ? error.message : String(error),
-              }),
-            },
-          ],
-        };
+  server.tool(
+    "send_email",
+    {
+      to: z.string().describe("Recipient email address"),
+      subject: z.string().describe("Subject of the email"),
+      text: z.string().describe("Plain text body of the email"),
+      html: z.string().optional().describe("HTML body of the email (optional)"),
+    },
+    { description: "Send an email to a recipient" },
+    async (args: SendEmailArgs) => {
+      if (!args.to || !args.subject || !args.text) {
+        throw new Error("Missing required arguments: to, subject, and text");
       }
+      const response = await emailClient.sendEmail(args);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              messageId: response.messageId,
+              accepted: response.accepted,
+              rejected: response.rejected,
+            }),
+          },
+        ],
+      };
     }
   );
 
- 
+  return server.server;
+});
 
-  const transport = new StdioServerTransport();
-  console.error("Email MCP Server running on stdio");
-  await server.connect(transport);
-}
-
-main().catch((error) => {
-  console.error("Fatal error in main():", error);
-  process.exit(1);
+const PORT = process.env.PORT || 8081;
+app.listen(PORT, () => {
+  console.log(`MCP server running on port ${PORT}`);
 });

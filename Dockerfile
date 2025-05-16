@@ -8,7 +8,7 @@ WORKDIR /app
 COPY . .
 
 # Install dependencies with script execution disabled
-RUN npm ci --ignore-scripts && npm run build
+RUN npm ci --ignore-scripts --omit-dev && npm run build
 
 # Set environment variables for HTTP transport
 ENV TRANSPORT=http

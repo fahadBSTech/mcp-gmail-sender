@@ -1,6 +1,6 @@
 // Type definitions for tool arguments
 export interface SendEmailArgs {
-  to: string;
+  to: string[];
   subject: string;
   text: string;
   html?: string;

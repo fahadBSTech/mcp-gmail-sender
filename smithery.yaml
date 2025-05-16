@@ -1,6 +1,6 @@
 
 startCommand:
-  type: http
+  type: stdio
   configSchema:
     type: object
     required:
